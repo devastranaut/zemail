@@ -32,7 +32,15 @@ async function resolveRequestIdentity(request: Request): Promise<{
   const headerApiKey = getApiKey(request);
 
   if (headerApiKey) {
-    return resolveUserByApiKey(headerApiKey);
+    const identity = await resolveUserByApiKey(headerApiKey);
+    if (!identity) {
+      return null;
+    }
+
+    return {
+      userId: identity.userId,
+      apiKeyId: identity.keyId,
+    };
   }
 
   const supabase = await createSupabaseServerClient();
