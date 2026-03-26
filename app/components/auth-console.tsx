@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { KeyRound, LogOut, Mail, Plus, ShieldCheck, MailWarning, Copy, Check, ExternalLink } from "lucide-react";
+import { KeyRound, LogOut, Mail, Plus, ShieldCheck, MailWarning, Copy, Check, ExternalLink, Trash2, Eye, EyeOff } from "lucide-react";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
@@ -28,6 +28,10 @@ export function AuthConsole() {
   const [keyName, setKeyName] = useState("");
   const [copied, setCopied] = useState(false);
   const [copiedConfig, setCopiedConfig] = useState(false);
+  const [revealLatestKey, setRevealLatestKey] = useState(false);
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [gmailStatusLoading, setGmailStatusLoading] = useState(false);
+  const [deletingKeyId, setDeletingKeyId] = useState<string | null>(null);
 
   const mcpApiKey = latestKey ?? "PASTE_YOUR_USER_MCP_KEY_HERE";
   const mcpConfigSnippet = `{
@@ -76,6 +80,46 @@ export function AuthConsole() {
     setKeys(data.keys ?? []);
   }, []);
 
+  const loadGmailStatus = useCallback(async () => {
+    setGmailStatusLoading(true);
+    try {
+      const response = await fetch("/api/auth/google/status", { method: "GET", cache: "no-store" });
+      if (!response.ok) {
+        setGmailConnected(false);
+        return;
+      }
+
+      const data = (await response.json()) as { connected?: boolean };
+      setGmailConnected(Boolean(data.connected));
+    } finally {
+      setGmailStatusLoading(false);
+    }
+  }, []);
+
+  async function revokeApiKey(keyId: string) {
+    setDeletingKeyId(keyId);
+    try {
+      const response = await fetch("/api/auth/mcp-key", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ keyId }),
+      });
+
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string };
+        setStatus({ message: data.error ?? "Failed to delete key", type: "error" });
+        return;
+      }
+
+      setStatus({ message: "API key deleted", type: "success" });
+      await loadKeys();
+    } catch {
+      setStatus({ message: "Network error deleting key", type: "error" });
+    } finally {
+      setDeletingKeyId(null);
+    }
+  }
+
   useEffect(() => {
     if (!supabase) return;
     loadSession();
@@ -88,10 +132,12 @@ export function AuthConsole() {
   useEffect(() => {
     if (userEmail) {
       void loadKeys();
+      void loadGmailStatus();
       return;
     }
     setKeys([]);
-  }, [loadKeys, userEmail]);
+    setGmailConnected(false);
+  }, [loadGmailStatus, loadKeys, userEmail]);
 
   async function signUp() {
     if (!supabase) return;
@@ -143,6 +189,7 @@ export function AuthConsole() {
       }
 
       setLatestKey(data.apiKey);
+      setRevealLatestKey(false);
       setStatus({ message: "New key activated", type: "success" });
       setKeyName("");
       setCopied(false);
@@ -248,14 +295,20 @@ export function AuthConsole() {
             <div className="flex flex-col gap-4 rounded-xl border border-zinc-800/60 bg-zinc-900/30 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-medium text-zinc-200">{userEmail}</p>
-                <p className="text-xs text-zinc-500">Connected primary account</p>
+                <p className="text-xs text-zinc-500">
+                  {gmailStatusLoading
+                    ? "Checking Gmail connection..."
+                    : gmailConnected
+                    ? "Gmail source connected"
+                    : "Gmail source not connected"}
+                </p>
               </div>
               <a
                 href="/api/auth/google/connect"
                 className="inline-flex items-center gap-2 rounded-lg bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-400 transition-colors hover:bg-indigo-500/20 active:bg-indigo-500/30"
               >
                 <ExternalLink className="h-4 w-4" />
-                Connect Gmail Source
+                {gmailConnected ? "Reconnect Gmail Source" : "Connect Gmail Source"}
               </a>
             </div>
 
@@ -315,8 +368,15 @@ export function AuthConsole() {
                   </div>
                   <div className="flex items-center gap-2">
                     <code className="block flex-1 overflow-x-auto rounded border border-emerald-500/20 bg-emerald-950/50 p-2.5 text-sm text-emerald-300 outline-none">
-                      {latestKey}
+                      {revealLatestKey ? latestKey : `${"*".repeat(24)}${latestKey.slice(-6)}`}
                     </code>
+                    <button
+                      onClick={() => setRevealLatestKey((value) => !value)}
+                      className="shrink-0 rounded bg-emerald-500/20 p-2.5 text-emerald-400 hover:bg-emerald-500/30 hover:text-emerald-300 transition-colors"
+                      title={revealLatestKey ? "Hide key" : "Show key"}
+                    >
+                      {revealLatestKey ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
                     <button
                       onClick={handleCopy}
                       className="shrink-0 rounded bg-emerald-500/20 p-2.5 text-emerald-400 hover:bg-emerald-500/30 hover:text-emerald-300 transition-colors"
@@ -337,11 +397,20 @@ export function AuthConsole() {
                   >
                     <div>
                       <p className="text-sm font-medium text-zinc-200">{key.name ?? "Unnamed Key"}</p>
-                      <p className="mt-1 font-mono text-[10px] text-zinc-500">{key.id}</p>
+                      <p className="mt-1 font-mono text-[10px] text-zinc-500">Key ID: {key.id.slice(0, 8)}...{key.id.slice(-6)}</p>
                     </div>
                     <div className="flex flex-col sm:items-end text-xs text-zinc-500 gap-1.5">
                       <p>Created: <span className="text-zinc-400">{new Date(key.createdAt).toLocaleDateString()}</span></p>
                       <p>Last use: <span className="text-zinc-400">{key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleDateString() : "Never"}</span></p>
+                      <button
+                        type="button"
+                        onClick={() => revokeApiKey(key.id)}
+                        disabled={deletingKeyId === key.id}
+                        className="inline-flex items-center gap-1 rounded border border-red-500/40 px-2 py-1 text-[11px] text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-60"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        {deletingKeyId === key.id ? "Deleting..." : "Delete"}
+                      </button>
                     </div>
                   </div>
                 ))}

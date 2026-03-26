@@ -68,6 +68,7 @@ export async function listUserApiKeys(userId: string): Promise<PublicApiKey[]> {
     .from("mcp_api_keys")
     .select("id, user_id, name, created_at, last_used_at, revoked_at")
     .eq("user_id", userId)
+    .is("revoked_at", null)
     .order("created_at", { ascending: false })
     .returns<ApiKeyRow[]>();
 
@@ -76,6 +77,24 @@ export async function listUserApiKeys(userId: string): Promise<PublicApiKey[]> {
   }
 
   return (data ?? []).map(toPublicApiKey);
+}
+
+export async function revokeUserApiKey(userId: string, keyId: string): Promise<boolean> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("mcp_api_keys")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", keyId)
+    .eq("user_id", userId)
+    .is("revoked_at", null)
+    .select("id")
+    .returns<{ id: string }[]>();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data?.length ?? 0) > 0;
 }
 
 export async function resolveUserByApiKey(apiKey: string): Promise<{
