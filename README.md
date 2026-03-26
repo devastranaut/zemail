@@ -4,10 +4,10 @@ Email operations for AI agents via MCP.
 
 Zemail is a client-agnostic MCP-style server built on Next.js that exposes four tools:
 
-- `email.send`
-- `email.read`
-- `email.summarize`
-- `email.reply`
+- `email_send`
+- `email_read`
+- `email_summarize`
+- `email_reply`
 
 ## API Endpoint
 
@@ -15,13 +15,20 @@ Zemail is a client-agnostic MCP-style server built on Next.js that exposes four 
 - `GET /api/mcp` returns tool metadata
 - `POST /api/mcp` also supports MCP JSON-RPC (`initialize`, `tools/list`, `tools/call`)
 
+Legacy dot-style names are still accepted for compatibility:
+
+- `email.send` -> `email_send`
+- `email.read` -> `email_read`
+- `email.summarize` -> `email_summarize`
+- `email.reply` -> `email_reply`
+
 ## Tool Contracts
 
-### `email.send`
+### `email_send`
 
 ```json
 {
-	"tool": "email.send",
+	"tool": "email_send",
 	"input": {
 		"to": "user@example.com",
 		"subject": "Hello",
@@ -30,33 +37,33 @@ Zemail is a client-agnostic MCP-style server built on Next.js that exposes four 
 }
 ```
 
-### `email.read`
+### `email_read`
 
 ```json
 {
-	"tool": "email.read",
+	"tool": "email_read",
 	"input": {
 		"limit": 5
 	}
 }
 ```
 
-### `email.summarize`
+### `email_summarize`
 
 ```json
 {
-	"tool": "email.summarize",
+	"tool": "email_summarize",
 	"input": {
 		"emailId": "18d8f64c0f8b1234"
 	}
 }
 ```
 
-### `email.reply`
+### `email_reply`
 
 ```json
 {
-	"tool": "email.reply",
+	"tool": "email_reply",
 	"input": {
 		"emailId": "18d8f64c0f8b1234"
 	}
@@ -144,5 +151,5 @@ npm run dev
 curl -X POST http://localhost:3000/api/mcp \
 	-H "Content-Type: application/json" \
 	-H "x-api-key: your-mcp-api-key" \
-	-d '{"tool":"email.read","input":{"limit":5}}'
+	-d '{"tool":"email_read","input":{"limit":5}}'
 ```
