@@ -16,6 +16,20 @@ export default function Home() {
         </header>
 
         <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6">
+          <h2 className="mb-2 text-lg font-medium text-white">Authenticate Gmail</h2>
+          <p className="mb-4 max-w-2xl text-sm text-zinc-300">
+            Before running MCP email tools, connect your Google account once from
+            this page.
+          </p>
+          <a
+            href="/api/auth/google/start?returnTo=/"
+            className="inline-flex items-center rounded-lg border border-zinc-700 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 transition hover:bg-white"
+          >
+            Authenticate with Google
+          </a>
+        </section>
+
+        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6">
           <h2 className="mb-3 text-lg font-medium text-white">Quick test</h2>
           <pre className="overflow-x-auto text-sm leading-6 text-zinc-200">
 {`curl -X POST http://localhost:3000/api/mcp \\
