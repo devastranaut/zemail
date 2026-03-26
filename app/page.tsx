@@ -78,6 +78,8 @@ export default function Home() {
         <footer className="mt-12 border-t border-zinc-800/60 pt-6 text-center text-sm text-zinc-600">
           <p>Zeppelin Labs &mdash; Zemail Model Context Protocol Interface &copy; {new Date().getFullYear()}</p>
         </footer>
+      </main>
     </div>
   );
+}
 }
