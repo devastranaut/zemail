@@ -1,25 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { createAuthTicket } from "@/lib/google/oauthSessionStore";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
-  const apiKey = process.env.MCP_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "Missing MCP_API_KEY environment variable" },
-      { status: 500 },
-    );
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.redirect(new URL("/?auth=required", request.url));
   }
 
-  const ticket = createAuthTicket(apiKey);
-  const setupKey = process.env.OAUTH_SETUP_KEY;
+  const ticket = createAuthTicket(user.id);
   const params = new URLSearchParams({
     ticket,
     returnTo: "/",
   });
 
-  if (setupKey) {
-    params.set("setupKey", setupKey);
+  if (process.env.OAUTH_SETUP_KEY) {
+    params.set("setupKey", process.env.OAUTH_SETUP_KEY);
   }
 
   const redirectUrl = new URL(`/api/auth/google/start?${params.toString()}`, request.url);

@@ -1,37 +1,52 @@
 import { ZodError } from "zod";
 
-import {
-  createAuthTicket,
-  getApiKeyRefreshToken,
-} from "@/lib/google/oauthSessionStore";
+import { resolveUserByApiKey, touchApiKeyUsage } from "@/lib/auth/apiKeys";
+import { getUserGoogleRefreshToken } from "@/lib/auth/googleConnections";
+import { createAuthTicket } from "@/lib/google/oauthSessionStore";
 import { getToolManifest } from "@/lib/mcp/registry";
 import {
   executeMcpJsonRpcRequest,
   executeMcpRequest,
   isMcpJsonRpcRequest,
 } from "@/lib/mcp/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function getApiKey(request: Request): string | null {
   const header = request.headers.get("x-api-key");
   return header && header.trim() ? header : null;
 }
 
-function authorized(request: Request): boolean {
-  const apiKey = process.env.MCP_API_KEY;
-  if (!apiKey) {
-    return false;
-  }
-
-  return getApiKey(request) === apiKey;
-}
-
-function getRuntimeRefreshToken(apiKey: string): string | null {
+function getEnvRefreshToken(): string | null {
   const envToken = process.env.GOOGLE_REFRESH_TOKEN;
   if (envToken) {
     return envToken;
   }
 
-  return getApiKeyRefreshToken(apiKey);
+  return null;
+}
+
+async function resolveRequestIdentity(request: Request): Promise<{
+  userId: string;
+  apiKeyId?: string;
+} | null> {
+  const headerApiKey = getApiKey(request);
+
+  if (headerApiKey) {
+    return resolveUserByApiKey(headerApiKey);
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return null;
+  }
+
+  return {
+    userId: user.id,
+  };
 }
 
 export async function GET() {
@@ -43,36 +58,42 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!authorized(request)) {
-    return Response.json(
-      {
-        error: "Unauthorized",
-      },
-      { status: 401 },
-    );
-  }
-
-  const apiKey = getApiKey(request);
-  if (!apiKey) {
+  const identity = await resolveRequestIdentity(request);
+  if (!identity) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
     const body = await request.json();
-    const refreshToken = getRuntimeRefreshToken(apiKey);
+    const refreshToken =
+      getEnvRefreshToken() ?? (await getUserGoogleRefreshToken(identity.userId));
 
     const createAuthUrl = () => {
-      const ticket = createAuthTicket(apiKey);
+      const ticket = createAuthTicket(identity.userId);
       const origin = new URL(request.url).origin;
-      return `${origin}/api/auth/google/start?ticket=${ticket}&returnTo=/`;
+      const params = new URLSearchParams({
+        ticket,
+        returnTo: "/",
+      });
+
+      if (process.env.OAUTH_SETUP_KEY) {
+        params.set("setupKey", process.env.OAUTH_SETUP_KEY);
+      }
+
+      return `${origin}/api/auth/google/start?${params.toString()}`;
     };
 
     if (isMcpJsonRpcRequest(body)) {
       const result = await executeMcpJsonRpcRequest(body, {
-        apiKey,
+        userId: identity.userId,
+        apiKeyId: identity.apiKeyId,
         refreshToken,
         getAuthUrl: createAuthUrl,
       });
+
+      if (identity.apiKeyId) {
+        await touchApiKeyUsage(identity.apiKeyId);
+      }
 
       if (result.body === null) {
         return new Response(null, { status: result.status });
@@ -93,9 +114,15 @@ export async function POST(request: Request) {
     }
 
     const result = await executeMcpRequest(body, {
-      apiKey,
+      userId: identity.userId,
+      apiKeyId: identity.apiKeyId,
       refreshToken,
     });
+
+    if (identity.apiKeyId) {
+      await touchApiKeyUsage(identity.apiKeyId);
+    }
+
     return Response.json(result.body, { status: result.status });
   } catch (error) {
     if (error instanceof ZodError) {

@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { upsertUserGoogleRefreshToken } from "@/lib/auth/googleConnections";
 import { exchangeOAuthCode } from "@/lib/google/oauth";
-import {
-  consumeAuthTicket,
-  setApiKeyRefreshToken,
-} from "@/lib/google/oauthSessionStore";
+import { consumeAuthTicket } from "@/lib/google/oauthSessionStore";
 
 function parseState(state: string | null): { returnTo: string; ticket?: string } {
   if (!state) {
@@ -53,10 +51,33 @@ export async function GET(request: NextRequest) {
 
     const refreshToken = tokens.refresh_token ?? "";
     const accessToken = tokens.access_token ?? "";
-    const apiKeyForTicket = state.ticket ? consumeAuthTicket(state.ticket) : null;
+    const userId = state.ticket ? consumeAuthTicket(state.ticket) : null;
 
-    if (apiKeyForTicket && refreshToken) {
-      setApiKeyRefreshToken(apiKeyForTicket, refreshToken);
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Invalid or expired OAuth ticket" },
+        { status: 400 },
+      );
+    }
+
+    if (!refreshToken) {
+      return NextResponse.json(
+        {
+          error:
+            "Google did not return a refresh token. Re-run consent and ensure prompt=consent.",
+        },
+        { status: 400 },
+      );
+    }
+
+    await upsertUserGoogleRefreshToken(userId, refreshToken);
+
+    const tokenHint = refreshToken.length > 16
+      ? `${refreshToken.slice(0, 8)}...${refreshToken.slice(-6)}`
+      : "stored";
+
+    if (!accessToken) {
+      console.warn("Google OAuth callback returned no access token");
     }
 
     const html = `<!doctype html>
@@ -76,10 +97,10 @@ export async function GET(request: NextRequest) {
   <body>
     <main>
       <h1>Google OAuth connected</h1>
-      <p>${apiKeyForTicket ? "Auth is now linked to your MCP API key for this runtime." : "Copy this refresh token to GOOGLE_REFRESH_TOKEN in your environment if you need persistent setup."}</p>
+      <p>Your Google account is now linked to your user profile.</p>
       <div class="card">
-        <h2>Refresh token</h2>
-        <pre>${escapeHtml(refreshToken || "No refresh token returned. Re-run auth with prompt=consent.")}</pre>
+        <h2>Status</h2>
+        <pre>${escapeHtml(`Refresh token securely stored (${tokenHint})`)}</pre>
       </div>
       <p>Access token returned: ${accessToken ? "yes" : "no"}</p>
       <p><a href="${escapeHtml(state.returnTo)}">Continue</a></p>

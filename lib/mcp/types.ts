@@ -6,7 +6,8 @@ export type McpResponse = {
 };
 
 export type McpToolContext = {
-  apiKey: string;
+  userId: string;
+  apiKeyId?: string;
   refreshToken: string;
 };
 

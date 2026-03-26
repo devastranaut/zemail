@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getGoogleConsentUrl } from "@/lib/google/oauth";
+import { createAuthTicket } from "@/lib/google/oauthSessionStore";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function isSetupAuthorized(request: NextRequest): boolean {
   const setupKey = process.env.OAUTH_SETUP_KEY;
@@ -17,7 +19,23 @@ export async function GET(request: NextRequest) {
   }
 
   const returnTo = request.nextUrl.searchParams.get("returnTo") ?? "/";
-  const ticket = request.nextUrl.searchParams.get("ticket") ?? undefined;
+  let ticket = request.nextUrl.searchParams.get("ticket") ?? undefined;
+
+  if (!ticket) {
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user) {
+      ticket = createAuthTicket(user.id);
+    }
+  }
+
+  if (!ticket) {
+    return NextResponse.json({ error: "Missing auth ticket" }, { status: 400 });
+  }
+
   const state = Buffer.from(JSON.stringify({ returnTo, ticket }), "utf-8").toString(
     "base64url",
   );

@@ -9,11 +9,27 @@ Zemail is a client-agnostic MCP-style server built on Next.js that exposes four 
 - `email_summarize`
 - `email_reply`
 
+## Multi-user Architecture
+
+- User signup/login is handled by Supabase Auth.
+- Every user can create their own MCP API keys.
+- Every user connects their own Google account.
+- Google refresh tokens are encrypted before storage.
+- MCP calls are resolved to a user via `x-api-key` (recommended for agents) or Supabase session cookies.
+
+Recommended identity strategy:
+
+- Use per-user MCP API keys for external MCP clients and agents.
+- Use Supabase user IDs as the internal identity key.
+- Never use a single global API key for all users.
+
 ## API Endpoint
 
 - `POST /api/mcp` executes a tool
 - `GET /api/mcp` returns tool metadata
 - `POST /api/mcp` also supports MCP JSON-RPC (`initialize`, `tools/list`, `tools/call`)
+- `GET /api/auth/mcp-key` lists keys for the signed-in user
+- `POST /api/auth/mcp-key` creates a new key for the signed-in user
 
 Legacy dot-style names are still accepted for compatibility:
 
@@ -72,15 +88,32 @@ Legacy dot-style names are still accepted for compatibility:
 
 ## Environment Variables
 
-Copy `.env.example` to `.env.local` and configure:
+Configure `.env.local`:
 
-- `MCP_API_KEY`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `APP_ENCRYPTION_KEY` (32-byte key encoded as base64/base64url)
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
-- `GOOGLE_REFRESH_TOKEN` (optional fallback for persistent server setup)
 - `GOOGLE_REDIRECT_URI`
+- `OAUTH_SETUP_KEY` (optional guard for `/api/auth/google/start`)
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL` (optional; defaults to `gpt-4o-mini`)
+- `GOOGLE_REFRESH_TOKEN` (optional global fallback; mainly for single-user/dev)
+
+Generate a valid encryption key:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+```
+
+## Supabase Setup
+
+1. Create a Supabase project.
+2. Enable email/password auth in Supabase Auth settings.
+3. Run [docs/supabase.sql](docs/supabase.sql) in Supabase SQL Editor.
+4. Add your app URL to Supabase Auth URL configuration.
 
 ## Gmail Setup Notes
 
@@ -101,42 +134,23 @@ Then set the same value in `GOOGLE_REDIRECT_URI`.
 
 ### First-run Auth Flow (No Refresh Token Env Needed)
 
-If `GOOGLE_REFRESH_TOKEN` is not set, Zemail will return `auth_required` with an `authUrl` from `/api/mcp`.
+If no per-user Google refresh token is available, Zemail returns `auth_required` with an `authUrl`.
 
-1. Call `/api/mcp` once.
+1. Sign in on the website.
+2. Create an MCP key.
+3. Call `/api/mcp` once using that key.
 2. Open the returned `authUrl` in a browser.
 3. Complete Google consent.
-4. Token is linked to your MCP API key for the current server runtime.
+4. Token is securely stored and linked to your user.
 5. Re-run your MCP call.
-
-Note: runtime-linked tokens are in-memory. A cold start/redeploy clears them.
 
 ### Authenticate from Main Page
 
-Use this route to connect Google from the website and link auth to your MCP API key runtime session:
+Use this route to connect Google from the website for the signed-in user:
 
 ```txt
 /api/auth/google/connect
 ```
-
-### Generate and Save Refresh Token (Persistent)
-
-1. Deploy your app and configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI`.
-2. Optionally set `OAUTH_SETUP_KEY` to protect setup routes.
-3. Open:
-
-```txt
-https://myzemail.vercel.app/api/auth/google/start?returnTo=/
-```
-
-If `OAUTH_SETUP_KEY` is set:
-
-```txt
-https://myzemail.vercel.app/api/auth/google/start?setupKey=YOUR_KEY&returnTo=/
-```
-
-4. Complete Google consent.
-5. Copy the refresh token shown on the callback page into `GOOGLE_REFRESH_TOKEN` in Vercel env vars.
 
 ## Local Run
 
@@ -150,6 +164,6 @@ npm run dev
 ```bash
 curl -X POST http://localhost:3000/api/mcp \
 	-H "Content-Type: application/json" \
-	-H "x-api-key: your-mcp-api-key" \
+	-H "x-api-key: YOUR_USER_MCP_KEY" \
 	-d '{"tool":"email_read","input":{"limit":5}}'
 ```

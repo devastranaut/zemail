@@ -107,7 +107,8 @@ export function isMcpJsonRpcRequest(rawBody: unknown): boolean {
 }
 
 type JsonRpcOptions = {
-  apiKey: string;
+  userId: string;
+  apiKeyId?: string;
   refreshToken: string | null;
   getAuthUrl: () => string;
   serverVersion?: string;
@@ -209,7 +210,8 @@ export async function executeMcpJsonRpcRequest(rawBody: unknown, options: JsonRp
       }
 
       const executed = await executeTool(paramsResult.data.tool, paramsResult.data.input, {
-        apiKey: options.apiKey,
+        userId: options.userId,
+        apiKeyId: options.apiKeyId,
         refreshToken: options.refreshToken,
       });
 

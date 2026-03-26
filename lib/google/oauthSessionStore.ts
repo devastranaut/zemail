@@ -1,11 +1,10 @@
 type AuthTicket = {
-  apiKey: string;
+  userId: string;
   expiresAt: number;
 };
 
 type RuntimeStore = {
   tickets: Map<string, AuthTicket>;
-  refreshTokensByApiKey: Map<string, string>;
 };
 
 declare global {
@@ -16,7 +15,6 @@ function getStore(): RuntimeStore {
   if (!globalThis.__zemailOauthStore__) {
     globalThis.__zemailOauthStore__ = {
       tickets: new Map(),
-      refreshTokensByApiKey: new Map(),
     };
   }
 
@@ -27,12 +25,12 @@ function randomId(): string {
   return crypto.randomUUID().replaceAll("-", "");
 }
 
-export function createAuthTicket(apiKey: string): string {
+export function createAuthTicket(userId: string): string {
   const store = getStore();
   const ticket = randomId();
 
   store.tickets.set(ticket, {
-    apiKey,
+    userId,
     expiresAt: Date.now() + 10 * 60 * 1000,
   });
 
@@ -49,15 +47,5 @@ export function consumeAuthTicket(ticket: string): string | null {
     return null;
   }
 
-  return match.apiKey;
-}
-
-export function setApiKeyRefreshToken(apiKey: string, refreshToken: string) {
-  const store = getStore();
-  store.refreshTokensByApiKey.set(apiKey, refreshToken);
-}
-
-export function getApiKeyRefreshToken(apiKey: string): string | null {
-  const store = getStore();
-  return store.refreshTokensByApiKey.get(apiKey) ?? null;
+  return match.userId;
 }
