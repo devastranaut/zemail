@@ -13,6 +13,7 @@ Zemail is a client-agnostic MCP-style server built on Next.js that exposes four 
 
 - `POST /api/mcp` executes a tool
 - `GET /api/mcp` returns tool metadata
+- `POST /api/mcp` also supports MCP JSON-RPC (`initialize`, `tools/list`, `tools/call`)
 
 ## Tool Contracts
 
@@ -102,6 +103,14 @@ If `GOOGLE_REFRESH_TOKEN` is not set, Zemail will return `auth_required` with an
 5. Re-run your MCP call.
 
 Note: runtime-linked tokens are in-memory. A cold start/redeploy clears them.
+
+### Authenticate from Main Page
+
+Use this route to connect Google from the website and link auth to your MCP API key runtime session:
+
+```txt
+/api/auth/google/connect
+```
 
 ### Generate and Save Refresh Token (Persistent)
 

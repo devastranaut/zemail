@@ -5,7 +5,11 @@ import {
   getApiKeyRefreshToken,
 } from "@/lib/google/oauthSessionStore";
 import { getToolManifest } from "@/lib/mcp/registry";
-import { executeMcpRequest } from "@/lib/mcp/server";
+import {
+  executeMcpJsonRpcRequest,
+  executeMcpRequest,
+  isMcpJsonRpcRequest,
+} from "@/lib/mcp/server";
 
 function getApiKey(request: Request): string | null {
   const header = request.headers.get("x-api-key");
@@ -53,24 +57,41 @@ export async function POST(request: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const refreshToken = getRuntimeRefreshToken(apiKey);
-  if (!refreshToken) {
-    const ticket = createAuthTicket(apiKey);
-    const origin = new URL(request.url).origin;
-    const authUrl = `${origin}/api/auth/google/start?ticket=${ticket}&returnTo=/`;
-
-    return Response.json(
-      {
-        error: "auth_required",
-        content: "Google OAuth is required before using email tools.",
-        authUrl,
-      },
-      { status: 428 },
-    );
-  }
-
   try {
     const body = await request.json();
+    const refreshToken = getRuntimeRefreshToken(apiKey);
+
+    const createAuthUrl = () => {
+      const ticket = createAuthTicket(apiKey);
+      const origin = new URL(request.url).origin;
+      return `${origin}/api/auth/google/start?ticket=${ticket}&returnTo=/`;
+    };
+
+    if (isMcpJsonRpcRequest(body)) {
+      const result = await executeMcpJsonRpcRequest(body, {
+        apiKey,
+        refreshToken,
+        getAuthUrl: createAuthUrl,
+      });
+
+      if (result.body === null) {
+        return new Response(null, { status: result.status });
+      }
+
+      return Response.json(result.body, { status: result.status });
+    }
+
+    if (!refreshToken) {
+      return Response.json(
+        {
+          error: "auth_required",
+          content: "Google OAuth is required before using email tools.",
+          authUrl: createAuthUrl(),
+        },
+        { status: 428 },
+      );
+    }
+
     const result = await executeMcpRequest(body, {
       apiKey,
       refreshToken,

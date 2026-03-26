@@ -22,7 +22,7 @@ export default function Home() {
             this page.
           </p>
           <a
-            href="/api/auth/google/start?returnTo=/"
+            href="/api/auth/google/connect"
             className="inline-flex items-center rounded-lg border border-zinc-700 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 transition hover:bg-white"
           >
             Authenticate with Google
