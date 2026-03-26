@@ -27,6 +27,20 @@ export function AuthConsole() {
   const [latestKey, setLatestKey] = useState<string | null>(null);
   const [keyName, setKeyName] = useState("");
   const [copied, setCopied] = useState(false);
+  const [copiedConfig, setCopiedConfig] = useState(false);
+
+  const mcpApiKey = latestKey ?? "PASTE_YOUR_USER_MCP_KEY_HERE";
+  const mcpConfigSnippet = `{
+  "servers": {
+    "custom": {
+      "url": "https://myzemail.vercel.app/api/mcp",
+      "headers": {
+        "x-api-key": "${mcpApiKey}"
+      },
+      "notes": "Sign in at https://myzemail.vercel.app, connect Gmail once, then invoke tools."
+    }
+  }
+}`;
 
   useEffect(() => {
     setSupabase(getSupabaseBrowserClient());
@@ -146,6 +160,12 @@ export function AuthConsole() {
     }
   };
 
+  const handleCopyConfig = () => {
+    navigator.clipboard.writeText(mcpConfigSnippet);
+    setCopiedConfig(true);
+    setTimeout(() => setCopiedConfig(false), 2000);
+  };
+
   return (
     <section className="relative overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/40 p-1">
       <div className="rounded-xl bg-zinc-950 p-6 md:p-8">
@@ -240,6 +260,28 @@ export function AuthConsole() {
             </div>
 
             <hr className="border-zinc-800/80" />
+
+            <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-medium text-zinc-100">MCP client config</h3>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Use this after connecting Gmail. Replace the placeholder if needed.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyConfig}
+                  className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800"
+                >
+                  {copiedConfig ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copiedConfig ? "Copied" : "Copy JSON"}
+                </button>
+              </div>
+              <pre className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs leading-relaxed text-zinc-300">
+                {mcpConfigSnippet}
+              </pre>
+            </div>
 
             {/* Key Management */}
             <div>
