@@ -45,13 +45,25 @@ type ExecuteToolResult = {
   toolName?: string;
 };
 
+function normalizeToolName(toolName: string): string {
+  const aliasMap: Record<string, string> = {
+    "email.send": "email_send",
+    "email.read": "email_read",
+    "email.summarize": "email_summarize",
+    "email.reply": "email_reply",
+  };
+
+  return aliasMap[toolName] ?? toolName;
+}
+
 async function executeTool(
   toolName: string,
   input: unknown,
   context: McpToolContext,
 ): Promise<ExecuteToolResult> {
   const registry = getToolRegistry();
-  const tool = registry.get(toolName);
+  const normalizedToolName = normalizeToolName(toolName);
+  const tool = registry.get(normalizedToolName);
 
   if (!tool) {
     return {

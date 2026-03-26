@@ -27,7 +27,7 @@ function replySubject(subject: string): string {
 }
 
 export const emailReplyTool: McpTool<typeof inputSchema> = {
-  name: "email.reply",
+  name: "email_reply",
   description: "Generate and send a reply",
   inputSchema,
   async execute(input, context) {

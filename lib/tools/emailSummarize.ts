@@ -9,7 +9,7 @@ const inputSchema = z.object({
 });
 
 export const emailSummarizeTool: McpTool<typeof inputSchema> = {
-  name: "email.summarize",
+  name: "email_summarize",
   description: "Summarize an email",
   inputSchema,
   async execute(input, context) {

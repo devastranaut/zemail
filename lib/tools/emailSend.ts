@@ -10,7 +10,7 @@ const inputSchema = z.object({
 });
 
 export const emailSendTool: McpTool<typeof inputSchema> = {
-  name: "email.send",
+  name: "email_send",
   description: "Send an email via Gmail",
   inputSchema,
   async execute(input, context) {

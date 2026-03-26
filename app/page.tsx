@@ -44,10 +44,10 @@ export default function Home() {
 
         <section className="grid gap-3 sm:grid-cols-2">
           {[
-            { name: "email.send", desc: "Send an email via Gmail" },
-            { name: "email.read", desc: "Fetch latest inbox emails" },
-            { name: "email.summarize", desc: "Summarize an email" },
-            { name: "email.reply", desc: "Generate and send a reply" },
+            { name: "email_send", desc: "Send an email via Gmail" },
+            { name: "email_read", desc: "Fetch latest inbox emails" },
+            { name: "email_summarize", desc: "Summarize an email" },
+            { name: "email_reply", desc: "Generate and send a reply" },
           ].map((tool) => (
             <article
               key={tool.name}

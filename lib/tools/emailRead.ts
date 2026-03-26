@@ -8,7 +8,7 @@ const inputSchema = z.object({
 });
 
 export const emailReadTool: McpTool<typeof inputSchema> = {
-  name: "email.read",
+  name: "email_read",
   description: "Fetch latest emails",
   inputSchema,
   async execute(input, context) {
