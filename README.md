@@ -1,36 +1,139 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Zemail
 
-## Getting Started
+Email operations for AI agents via MCP.
 
-First, run the development server:
+Zemail is a client-agnostic MCP-style server built on Next.js that exposes four tools:
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- `email.send`
+- `email.read`
+- `email.summarize`
+- `email.reply`
+
+## API Endpoint
+
+- `POST /api/mcp` executes a tool
+- `GET /api/mcp` returns tool metadata
+
+## Tool Contracts
+
+### `email.send`
+
+```json
+{
+	"tool": "email.send",
+	"input": {
+		"to": "user@example.com",
+		"subject": "Hello",
+		"body": "Test email"
+	}
+}
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### `email.read`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```json
+{
+	"tool": "email.read",
+	"input": {
+		"limit": 5
+	}
+}
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### `email.summarize`
 
-## Learn More
+```json
+{
+	"tool": "email.summarize",
+	"input": {
+		"emailId": "18d8f64c0f8b1234"
+	}
+}
+```
 
-To learn more about Next.js, take a look at the following resources:
+### `email.reply`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```json
+{
+	"tool": "email.reply",
+	"input": {
+		"emailId": "18d8f64c0f8b1234"
+	}
+}
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Environment Variables
 
-## Deploy on Vercel
+Copy `.env.example` to `.env.local` and configure:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `MCP_API_KEY`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REFRESH_TOKEN` (optional fallback for persistent server setup)
+- `GOOGLE_REDIRECT_URI`
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL` (optional; defaults to `gpt-4o-mini`)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Gmail Setup Notes
+
+Use Google Cloud OAuth2 credentials with scopes:
+
+- `https://www.googleapis.com/auth/gmail.readonly`
+- `https://www.googleapis.com/auth/gmail.send`
+
+The server authenticates Gmail requests with OAuth2 and a refresh token.
+
+### Redirect URI for Deployment
+
+Set this exact redirect URI in Google Cloud OAuth client settings:
+
+- `https://myzemail.vercel.app/api/auth/google/callback`
+
+Then set the same value in `GOOGLE_REDIRECT_URI`.
+
+### First-run Auth Flow (No Refresh Token Env Needed)
+
+If `GOOGLE_REFRESH_TOKEN` is not set, Zemail will return `auth_required` with an `authUrl` from `/api/mcp`.
+
+1. Call `/api/mcp` once.
+2. Open the returned `authUrl` in a browser.
+3. Complete Google consent.
+4. Token is linked to your MCP API key for the current server runtime.
+5. Re-run your MCP call.
+
+Note: runtime-linked tokens are in-memory. A cold start/redeploy clears them.
+
+### Generate and Save Refresh Token (Persistent)
+
+1. Deploy your app and configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI`.
+2. Optionally set `OAUTH_SETUP_KEY` to protect setup routes.
+3. Open:
+
+```txt
+https://myzemail.vercel.app/api/auth/google/start?returnTo=/
+```
+
+If `OAUTH_SETUP_KEY` is set:
+
+```txt
+https://myzemail.vercel.app/api/auth/google/start?setupKey=YOUR_KEY&returnTo=/
+```
+
+4. Complete Google consent.
+5. Copy the refresh token shown on the callback page into `GOOGLE_REFRESH_TOKEN` in Vercel env vars.
+
+## Local Run
+
+```bash
+npm install
+npm run dev
+```
+
+## Example Request
+
+```bash
+curl -X POST http://localhost:3000/api/mcp \
+	-H "Content-Type: application/json" \
+	-H "x-api-key: your-mcp-api-key" \
+	-d '{"tool":"email.read","input":{"limit":5}}'
+```
